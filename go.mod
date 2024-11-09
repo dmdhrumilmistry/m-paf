@@ -1,4 +1,4 @@
-module github.com/dmdhrumilmistry/m-pat
+module github.com/dmdhrumilmistry/m-paf
 
 go 1.23.1
 

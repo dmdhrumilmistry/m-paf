@@ -6,9 +6,9 @@ import (
 	"slices"
 	"strings"
 
-	_ "github.com/dmdhrumilmistry/m-pat/pkg/logging"
-	"github.com/dmdhrumilmistry/m-pat/pkg/sbom"
-	"github.com/dmdhrumilmistry/m-pat/pkg/socketdev"
+	_ "github.com/dmdhrumilmistry/m-paf/pkg/logging"
+	"github.com/dmdhrumilmistry/m-paf/pkg/sbom"
+	"github.com/dmdhrumilmistry/m-paf/pkg/socketdev"
 	"github.com/rs/zerolog/log"
 )
 
