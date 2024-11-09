@@ -4,6 +4,12 @@
 
 Malicious-PAckageFinder (m-paf), The CLI tool for discovering malicious and risky packages using SBOM files.
 
+## Demo
+
+https://github.com/dmdhrumilmistry/m-paf/raw/refs/heads/main/.static/videos/m-paf.mp4
+
+## Installation
+
 #### Github Hosted Method
 
 - Install latest release using below command
