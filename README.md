@@ -6,7 +6,7 @@ Malicious-PAckageFinder (m-paf), The CLI tool for discovering malicious and risk
 
 ## Demo
 
-https://github.com/dmdhrumilmistry/m-paf/raw/refs/heads/main/.static/videos/m-paf.mp4
+<https://github.com/dmdhrumilmistry/m-paf/raw/refs/heads/main/.static/videos/m-paf.mp4>
 
 ## Installation
 
