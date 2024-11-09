@@ -38,10 +38,10 @@ type Qualifiers struct {
 
 type Scores struct {
 	SupplyChain   float64 `json:"supplyChain"`
-	Quality       int     `json:"quality"`
-	Maintenance   int     `json:"maintenance"`
-	Vulnerability int     `json:"vulnerability"`
-	License       int     `json:"license"`
+	Quality       float64 `json:"quality"`
+	Maintenance   float64 `json:"maintenance"`
+	Vulnerability float64 `json:"vulnerability"`
+	License       float64 `json:"license"`
 	Overall       float64 `json:"overall"`
 }
 

@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sync"
 
+	cdx "github.com/CycloneDX/cyclonedx-go"
 	packageurl "github.com/package-url/packageurl-go"
+	"github.com/rs/zerolog/log"
 )
 
 type Api struct {
@@ -74,6 +77,10 @@ func (c *Api) GetAlerts(purl string) ([]PackageInfo, error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("api returned 404 for purl - %s", pUrl)
+	}
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("api returned %d instead of 200, with resp: %v", res.StatusCode, res)
 	}
@@ -130,4 +137,81 @@ func (c *Api) getAlertTypes() error {
 	c.AlertTypes = alertMaps
 
 	return nil
+}
+
+func (c *Api) ProcessComponents(bom *cdx.BOM, workers int) []PackageInfo {
+
+	jobQueue := make(chan cdx.Component, len(*bom.Components))
+	results := make(chan PackageInfo, len(*bom.Components))
+
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for component := range jobQueue {
+				log.Info().Msgf("Processing purl component - %s", component.PackageURL)
+				packageInfo, err := c.GetAlerts(component.PackageURL)
+				if err != nil {
+					log.Printf("failed to get alerts for purl: %s, error: %v", component.PackageURL, err)
+					continue
+				}
+
+				results <- packageInfo[0]
+			}
+		}()
+	}
+
+	// Feed jobs to jobQueue
+	for _, component := range *bom.Components {
+		jobQueue <- component
+	}
+	close(jobQueue) // No more jobs
+
+	// Wait for all workers to finish
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var packagesInfo []PackageInfo
+	for result := range results {
+		packagesInfo = append(packagesInfo, result)
+	}
+
+	return packagesInfo
+	// Print all collected results at the end
+	// for result := range results {
+	// 	log.Printf("Alerts for %s", result.Name)
+	// 	for _, alertData := range result.Alerts {
+	// 		alert := c.AlertTypes[alertData.Type].I18n["en-US"]
+	// 		msg := fmt.Sprintf("%s - %s\nDescription: %s\nSuggestion: %s", alert.Emoji, alert.Title, alert.Description, alert.Suggestion)
+	// 		log.Print(msg)
+	// 	}
+	// 	log.Print("----------------------------")
+	// }
+
+	// for _, component := range *bom.Components {
+
+	// 	if component.PackageURL != "pkg:maven/org.apache.poi/poi-ooxml-schemas@3.17?type=jar" {
+	// 		continue
+	// 	}
+
+	// 	log.Info().Msgf("Processing purl component - %s", component.PackageURL)
+	// 	packageInfo, err := c.GetAlerts(component.PackageURL)
+	// 	if err != nil {
+	// 		log.Error().Err(err).Msgf("failed to get alerts for purl: %s", component.PackageURL)
+	// 		continue
+	// 	}
+	// 	log.Info().Interface("package info", packageInfo).Msg("")
+
+	// 	for _, alertData := range packageInfo[0].Alerts {
+	// 		alert := c.AlertTypes[alertData.Type].I18n["en-US"]
+	// 		msg := fmt.Sprintf("%s - %s\nDescription: %s\nSuggestion: %s", alert.Emoji, alert.Title, alert.Description, alert.Suggestion)
+	// 		log.Warn().Msg(msg)
+	// 	}
+	// 	log.Print("----------------------------")
+	// }
 }

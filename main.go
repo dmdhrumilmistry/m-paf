@@ -2,6 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"slices"
+	"strings"
 
 	_ "github.com/dmdhrumilmistry/m-pat/pkg/logging"
 	"github.com/dmdhrumilmistry/m-pat/pkg/sbom"
@@ -9,8 +12,33 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+func banner() {
+	fmt.Print(`
+======================================================
+
+      ███╗   ███╗      ██████╗  █████╗ ███████╗
+      ████╗ ████║      ██╔══██╗██╔══██╗██╔════╝
+      ██╔████╔██║█████╗██████╔╝███████║█████╗  
+      ██║╚██╔╝██║╚════╝██╔═══╝ ██╔══██║██╔══╝  
+      ██║ ╚═╝ ██║      ██║     ██║  ██║██║     
+      ╚═╝     ╚═╝      ╚═╝     ╚═╝  ╚═╝╚═╝     
+------------------------------------------------------
+            Malicious-PAckageFinder
+======================================================
+  Detect malicious packages and risks from SBOM file
+------------------------------------------------------
+         github.com/dmdhrumilmistry/m-paf
+------------------------------------------------------
+
+`)
+}
+
 func main() {
-	filePath := flag.String("f", "", "path of sbom file")
+	banner()
+
+	filePath := flag.String("f", "", "Path to CycloneDX SBOM file")
+	workers := flag.Int("w", 50, "Number of workers for scanning malicious package in SBOM. Default value: 50")
+	acceptableSCRisk := flag.Float64("t", 0.5, "Acceptable Supply Chain Risk Score Threshold. Higher the score better, lower the risk. Ranges between 0 to 1. Default: 0.5")
 	flag.Parse()
 
 	api, err := socketdev.NewSocketAPI()
@@ -23,26 +51,37 @@ func main() {
 		log.Fatal().Err(err).Msgf("failed to parse SBOM file: %s", *filePath)
 	}
 
-	for _, component := range *bom.Components {
+	packagesInfo := api.ProcessComponents(bom, *workers)
 
-		if component.PackageURL != "pkg:maven/org.apache.poi/poi-ooxml-schemas@3.17?type=jar" {
-			continue
+	scRiskyPackages := []string{}
+	alertsMap := map[int][]string{}
+	for _, packageInfo := range packagesInfo {
+		// detect packages with lower supply chain security score
+		if packageInfo.Scores.SupplyChain < *acceptableSCRisk {
+			scRiskyPackages = append(scRiskyPackages, fmt.Sprintf("%s (%.2f)", packageInfo.Name, packageInfo.Scores.SupplyChain))
 		}
 
-		log.Info().Msgf("Processing purl component - %s", component.PackageURL)
-		packageInfo, err := api.GetAlerts(component.PackageURL)
-		if err != nil {
-			log.Error().Err(err).Msgf("failed to get alerts for purl: %s", component.PackageURL)
-			continue
+		// create map of alerts
+		for _, alert := range packageInfo.Alerts {
+			if !slices.Contains(alertsMap[alert.Type], packageInfo.Name) {
+				alertsMap[alert.Type] = append(alertsMap[alert.Type], packageInfo.Name)
+			}
 		}
-		log.Info().Interface("package info", packageInfo).Msg("")
-
-		// for _, alertData := range packageInfo[0].Alerts {
-		// 	alert := api.AlertTypes[alertData.Type].I18n["en-US"]
-		// 	msg := fmt.Sprintf("%s - %s\nDescription: %s\nSuggestion: %s", alert.Emoji, alert.Title, alert.Description, alert.Suggestion)
-		// 	log.Warn().Msg(msg)
-		// }
-		// log.Print("----------------------------")
 	}
 
+	log.Info().Msg("Package Analysis Completed")
+	log.Info().Msg("Packages having supply chain risk lower than acceptable value")
+	fmt.Println("Risky Packages: " + strings.Join(scRiskyPackages, ", "))
+	fmt.Println("======================================================")
+
+	log.Info().Msg("Alerts for Packages")
+	for alertId, packages := range alertsMap {
+		alert := api.AlertTypes[alertId].I18n["en-US"]
+		fmt.Printf("%s - %s\n", alert.Emoji, alert.Title)
+		fmt.Println("Description:", alert.Description)
+		fmt.Println("Suggestion:", alert.Suggestion)
+		fmt.Println("Risky Packages:", strings.Join(packages, ", "))
+		fmt.Println("------------------------------------------------------")
+	}
+	fmt.Println("======================================================")
 }
