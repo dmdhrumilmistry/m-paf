@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
@@ -159,7 +160,14 @@ func (c *Api) ProcessComponents(bom *cdx.BOM, workers int) []PackageInfo {
 					continue
 				}
 
-				results <- packageInfo[0]
+				log.Print(packageInfo)
+				log.Print(strings.Repeat("=", 10))
+
+				if len(packageInfo) > 0 {
+					results <- packageInfo[0]
+				} else {
+					results <- PackageInfo{}
+				}
 			}
 		}()
 	}
